@@ -1,0 +1,17 @@
+# Credentials and Secrets
+credentials.json
+token.pkl
+secrets.toml
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Streamlit
+.streamlit/
+
+# Downloads
+downloads/
+*.zip
