@@ -73,7 +73,23 @@ def authenticate_gmail():
                         st.error("❌ Missing 'credentials.json' locally AND missing secrets on Cloud.")
                         st.stop()
 
-                creds = flow.run_local_server(port=0)
+                try:
+                    creds = flow.run_local_server(port=0)
+                except OSError: # catching webbrowser.Error (which is often OSError or subclass)
+                    st.error("❌ **Authentication Failed: Headless Environment Detected**")
+                    st.warning(
+                        """
+                        It looks like you are running on **Streamlit Cloud** (or a headless server) 
+                        but haven't configured the **User Token** in your Secrets yet.
+                        
+                        The app is trying to open a browser to login, which fails on the cloud.
+                        """
+                    )
+                    st.info("👉 **Solution:** Run the app LOCALLY first to generate `token.pkl`, then run `get_secrets_from_token.py` to get the secrets to paste into Streamlit Cloud.")
+                    st.stop()
+                except Exception as e:
+                     st.error(f"❌ Authentication Error: {e}")
+                     st.stop()
 
         # Save the credentials for the next run (only useful locally)
         with open(TOKEN_FILE, "wb") as token:
