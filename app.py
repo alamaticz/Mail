@@ -37,26 +37,43 @@ def authenticate_gmail():
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         
-        # Check if secrets exist for headless auth
-        elif "gmail_token" in st.secrets:
-            from google.oauth2.credentials import Credentials
-            creds = Credentials.from_authorized_user_info(st.secrets["gmail_token"], SCOPES)
-            
-        # 3. Fallback to Local Interactive Auth (First time run locally)
         else:
-            gmail_config = {
-                "installed": {
-                    "client_id": st.secrets["gmail"]["client_id"],
-                    "project_id": st.secrets["gmail"]["project_id"],
-                    "auth_uri": st.secrets["gmail"]["auth_uri"],
-                    "token_uri": st.secrets["gmail"]["token_uri"],
-                    "client_secret": st.secrets["gmail"]["client_secret"],
-                    "redirect_uris": st.secrets["gmail"]["redirect_uris"]
-                }
-            }
+            # Check if secrets exist for headless auth (Safely)
+            try:
+                if "gmail_token" in st.secrets:
+                    from google.oauth2.credentials import Credentials
+                    creds = Credentials.from_authorized_user_info(st.secrets["gmail_token"], SCOPES)
+            except Exception:
+                # No secrets found, proceed to local interactive auth
+                pass
+            
+            # 3. Fallback to Local Interactive Auth (First time run locally)
+            if not creds:
+                # We need client_config. If secrets are missing, we can't run this either unless we have credentials.json
+                # But wait, the user has credentials.json locally.
+                
+                if os.path.exists("credentials.json"):
+                    flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
+                else:
+                    # Fallback to secrets if credentials.json is missing (Cloud case where secrets might be partial?)
+                    # This handles the case where we are local but using secrets for config
+                    try:
+                        gmail_config = {
+                            "installed": {
+                                "client_id": st.secrets["gmail"]["client_id"],
+                                "project_id": st.secrets["gmail"]["project_id"],
+                                "auth_uri": st.secrets["gmail"]["auth_uri"],
+                                "token_uri": st.secrets["gmail"]["token_uri"],
+                                "client_secret": st.secrets["gmail"]["client_secret"],
+                                "redirect_uris": st.secrets["gmail"]["redirect_uris"]
+                            }
+                        }
+                        flow = InstalledAppFlow.from_client_config(gmail_config, SCOPES)
+                    except Exception:
+                        st.error("❌ Missing 'credentials.json' locally AND missing secrets on Cloud.")
+                        st.stop()
 
-            flow = InstalledAppFlow.from_client_config(gmail_config, SCOPES)
-            creds = flow.run_local_server(port=0)
+                creds = flow.run_local_server(port=0)
 
         # Save the credentials for the next run (only useful locally)
         with open(TOKEN_FILE, "wb") as token:
